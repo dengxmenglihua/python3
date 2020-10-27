@@ -1,0 +1,55 @@
+import requests
+import json
+import os
+import threading
+import re
+import time
+h=[] #定义数列
+# from lxml import etree
+s = time.time()  #获取程序启动时的时间
+#print(s)
+def pa(i,se):
+    se.acquire()  #信号量减一
+    id = i['heroId'] #获取heroId的值
+    name = i['title']  #获取title的值
+    res3 = requests.get("https://game.gtimg.cn/images/lol/act/img/js/hero/{}.js".format(id)) #访问js文件获取一个英雄的所有信息
+    res3_json = json.loads(res3.text)  #把格式转化为json格式
+    data3 = res3_json.get('skins') #获取skins的值
+    # print(data3)
+    for j in data3:
+        names = j['name'] #获取name的值
+        skinId = j['skinId'] #获取skinId的值
+        c = re.findall(r'[^*"/:?\\|<>]',names,re.S)  #排除匹配的特殊字符
+        d = "".join(c)  #传递给d
+        # print(names,skinId)
+        res2 = requests.get('https://game.gtimg.cn/images/lol/act/img/skin/big{}.jpg'.format(skinId)) #访问图片获取响应包
+        if res2.status_code == 200: #判断是否响应成功
+            res2_content = res2.content #转换为2进制
+            #print(res2.text)
+            a = './英雄联盟/' + str(name)
+            b = a + '/' + str(d) + '.jpg'
+            #print(a, b)
+            if not os.path.exists('./英雄联盟/'): #如果不存在此目录时
+                os.mkdir('./英雄联盟/') #创建目录
+            if not os.path.exists(a):
+                os.mkdir(a)
+            with open(b, "wb") as f:  #生成.jpg的空白图片
+                f.write(res2_content) #把获取的2进制写入图片内
+                print(d) #输出信息
+    se.release() #信号量加1
+def duo():
+    res1 = requests.get("https://game.gtimg.cn/images/lol/act/img/js/heroList/hero_list.js") #访问js文件
+    res1_json = json.loads(res1.text) #改为json格式
+    # print(res1_json)
+    data1 = res1_json.get('hero')  #获取hero的值
+    semaphore=threading.Semaphore(20)  #线程为50
+    for i in data1:
+        t=threading.Thread(target=pa,args=(i,semaphore)) #pa为pa()函数，i和semaphore为传递的参数
+        t.start() #执行多线程
+        h.append(t) #把对象储存在列表中
+    for k in h:
+        k.join()  #子线程执行完才执行主线程
+if __name__=='__main__': #调用则不能执行下面的函数
+    duo()
+    f=time.time()  #程序执行完成后的时间戳
+    print('用时：',f-s,'秒') #爬虫完成所需的时间
